@@ -1,0 +1,11 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: dbt-training-463806
+      dataset: dbt_vnguyen
+      threads: 4 # Must be a value of 1 or greater
+      keyfile: dbt-training-463806-151186c31386.json
+      OPTIONAL_CONFIG: VALUE

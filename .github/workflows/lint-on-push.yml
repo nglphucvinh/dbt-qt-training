@@ -1,0 +1,55 @@
+name: SQLFluff Lint
+on:
+    pull_request:                                                             
+        branches: ["main"]
+        paths: ['**/*.sql']
+
+jobs:
+    sqlfluff-lint:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: '3.9'
+
+            - name: Install dependencies
+              run: |
+                  pip install sqlfluff sqlfluff-templater-dbt dbt-core dbt-bigquery
+
+            - name: Setup BigQuery Credentials
+              run: |
+                  echo "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_KEY}}" | base64 -d > gcp-key.json
+
+            - name: Create dbt profile
+              run: |
+                mkdir -p ~/.dbt
+                cat > ~/.dbt/profiles.yml << 'EOF'
+                dbt_project:
+                    target: dev
+                    outputs:
+                    dev:
+                        type: bigquery
+                        method: service-account
+                        project: ${{ vars.DBT_PROJECT_ID }}
+                        dataset: dbt_ci_temp
+                        keyfile: ./gcp-key.json
+                        location: US
+                        priority: interactive
+                        maximum_bytes_billed: 1000000000
+                EOF
+
+            - name: Install dbt dependencies
+              run: |
+                if [ -f "packages.yml" ]; then dbt deps; fi
+
+            - name: Run SQLFluff Lint
+              run: |
+                  sqlfluff lint models/ --dialect bigquery --templater dbt --format github-annotation-native
+            
+            - name: Cleanup credentials
+              if: always()
+              run: rm -f gcp-key.json
