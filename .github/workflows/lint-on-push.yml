@@ -22,24 +22,33 @@ jobs:
 
             - name: Setup BigQuery Credentials
               run: |
-                  echo "${{ secrets.BIGQUERY_SERVICE_ACCOUNT_KEY}}" | base64 -d > gcp-key.json
+                  echo '${{ secrets.BIGQUERY_SERVICE_ACCOUNT_KEY}}' | base64 -d > gcp-key.json
+                  
+                  # Verify the JSON is valid
+                  if jq empty gcp-key.json; then
+                    echo "✅ Valid JSON created"
+                  else
+                    echo "❌ Invalid JSON - checking content format"
+                    head -5 gcp-key.json
+                    exit 1
+                  fi
 
             - name: Create dbt profile
               run: |
                 mkdir -p ~/.dbt
                 cat > ~/.dbt/profiles.yml << 'EOF'
                 dbt_project:
-                    target: dev
-                    outputs:
+                  target: dev
+                  outputs:
                     dev:
-                        type: bigquery
-                        method: service-account
-                        project: ${{ vars.DBT_PROJECT_ID }}
-                        dataset: dbt_ci_temp
-                        keyfile: ./gcp-key.json
-                        location: US
-                        priority: interactive
-                        maximum_bytes_billed: 1000000000
+                      type: bigquery
+                      method: service-account
+                      project: ${{ vars.DBT_PROJECT_ID }}
+                      dataset: dbt_ci_temp
+                      keyfile: ./gcp-key.json
+                      location: US
+                      priority: interactive
+                      maximum_bytes_billed: 1000000000
                 EOF
 
             - name: Install dbt dependencies
@@ -48,8 +57,11 @@ jobs:
 
             - name: Run SQLFluff Lint
               run: |
-                  sqlfluff lint models/ --dialect bigquery --templater dbt --format github-annotation-native
-            
-            - name: Cleanup credentials
-              if: always()
-              run: rm -f gcp-key.json
+                  sqlfluff lint models/ \
+                    --dialect bigquery \
+                    --templater dbt \
+                    --config .sqlfluff \
+                    --format github-annotation-native            
+            # - name: Cleanup credentials
+            #   if: always()
+            #   run: rm -f gcp-key.json
